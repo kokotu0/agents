@@ -367,3 +367,60 @@ If implementation is paused and resumed:
 4. **Keep plan.md updated** - Task status must reflect actual progress
 5. **Commit frequently** - Each task completion should be committed
 6. **Track all commits** - Record commit hashes in metadata.json for potential revert
+
+## Subagent Invocation Rules
+
+Task 도구를 사용하여 서브에이전트를 호출할 때 다음 규칙을 따릅니다.
+
+### 1. 호출 시점
+
+- 단일 태스크가 독립적으로 실행 가능할 때
+- 병렬로 여러 작업을 처리해야 할 때
+- 특정 도메인 전문성이 필요한 작업
+
+### 2. 모델 선택 기준
+
+| 작업 유형 | 모델 | 이유 |
+|----------|------|------|
+| 일반 구현 작업 | sonnet | 비용 효율, 충분한 성능 |
+| 검증/분석 (conductor-validator) | opus | 정확성 중요 |
+| 탐색/간단한 작업 | haiku | 빠른 응답, 저비용 |
+
+### 3. 에이전트 타입 매핑
+
+| 작업 | subagent_type | 모델 |
+|------|---------------|------|
+| 프로젝트 검증 | conductor:conductor-validator | opus |
+| 백엔드 구현 | python-development:python-pro | sonnet |
+| 프론트엔드 구현 | frontend-mobile-development:frontend-developer | sonnet |
+| 코드 리뷰 | code-reviewer | sonnet |
+| E2E 테스트 | e2e-test | haiku |
+| 테스트 자동화 | full-stack-orchestration:test-automator | sonnet |
+
+### 4. 재호출 시 모델 업그레이드 규칙
+
+코드 리뷰에서 문제가 발견되거나 사용자가 문제를 지적하여 **재호출이 필요한 경우**, 한 단계 상위 모델을 사용합니다:
+
+| 최초 모델 | 재호출 시 모델 |
+|----------|---------------|
+| haiku | sonnet |
+| sonnet | opus |
+| opus | opus (유지) |
+
+**재호출 판단 기준:**
+- 코드 리뷰 결과 CRITICAL 또는 WARNING 이슈 발견
+- 사용자가 구현 품질에 문제 제기
+- 테스트 실패 후 수정 필요
+- 동일 태스크 2회 이상 시도
+
+### 5. 필수 파라미터
+
+Task 도구 호출 시 반드시 다음을 명시합니다:
+
+```
+Task(
+  subagent_type: "에이전트 타입",
+  model: "sonnet",  // 반드시 명시
+  prompt: "컨텍스트와 목표를 명확히 기술"
+)
+```
